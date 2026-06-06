@@ -10,14 +10,23 @@ class LocationController extends Controller
 {
     public function getGovernorates()
     {
-        $governorates = Location::whereNull('parent_id')->get();
-        return response()->json($governorates);
+        // جلب المحافظات (التي ليس لها أب) مع تحميل الأبناء والأحفاد
+        $governorates = Location::whereNull('parent_id')
+            ->with('children.children')
+            ->get();
+        return response()->json($governorates, 200, [], JSON_UNESCAPED_UNICODE);
     }
 
-    // دالة لجلب الأحياء التابعة لمحافظة معينة
+    // جلب الأحياء التابعة لمحافظة معينة
     public function getDistricts($parentId)
     {
-        $districts = Location::where('parent_id', $parentId)->get();
-        return response()->json($districts);
+        // جلب المنطقة مع كافة فروعها المتداخلة
+        $location = Location::with('children.children')->find($parentId);
+
+        if (!$location) {
+            return response()->json(['message' => 'المنطقة غير موجودة'], 404);
+        }
+
+        return response()->json($location, 200, [], JSON_UNESCAPED_UNICODE);
     }
 }

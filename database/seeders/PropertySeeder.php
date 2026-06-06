@@ -27,7 +27,7 @@ class PropertySeeder extends Seeder
             'has_elevator'=> true,
             'ownership_type' => 'green_taboo',
             'is_featured' => false,
-            'is_available' => true,
+            'status' => 'available',
             'area' => 150
 
 

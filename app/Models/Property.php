@@ -8,9 +8,20 @@ class Property extends Model
 {
     // السماح بإدخال البيانات لهذه الحقول
     protected $fillable = [
-        'user_id', 'location_id', 'title', 'description',
-        'price', 'area', 'rooms_count', 'property_type',
-        'ownership_type', 'offer_type'
+        'user_id',
+        'location_id',
+        'title',
+        'description',
+        'price',
+        'area',
+        'rooms_count',
+        'is_furnished',
+        'has_elevator',
+        'property_type',
+        'ownership_type',
+        'offer_type',
+        'is_featured',
+        'status'
     ];
 
     // علاقة العقار بالصور (عقار واحد له صور كثيرة)
@@ -29,6 +40,11 @@ class Property extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function favoritedByUsers()
+    {
+        return $this->belongsToMany(User::class, 'property_user')->withTimestamps();
     }
 
 }

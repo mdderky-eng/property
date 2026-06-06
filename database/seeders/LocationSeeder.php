@@ -13,17 +13,83 @@ class LocationSeeder extends Seeder
      */
     public function run(): void
     {
+        // 1. المحافظات الرئيسية (المستوى الأول)
         $damascus = Location::create(['name' => 'دمشق', 'parent_id' => null]);
         $rif_damascus = Location::create(['name' => 'ريف دمشق', 'parent_id' => null]);
-        $aleppo = Location::create(['name' => 'حلب', 'parent_id' => null]);
 
-        // 2. إضافة الأحياء وربطها بالمحافظات (عبر الـ ID الخاص بكل محافظة)
-        Location::create(['name' => 'المزة', 'parent_id' => $damascus->id]);
-        Location::create(['name' => 'أبو رمانة', 'parent_id' => $damascus->id]);
+        // 2. مناطق مدينة دمشق (المستوى الثاني - بناءً على الصورة الأولى)
+        $damascusAreas = [
+            'دمشق القديمة',
+            'ساروجة',
+            'القنوات',
+            'جوبر',
+            'الميدان',
+            'الشاغور',
+            'القدم',
+            'كفر سوسة',
+            'المزة',
+            'دمر',
+            'برزة',
+            'القابون',
+            'ركن الدين',
+            'الصالحية',
+            'المهاجرين',
+            'اليرموك'
+        ];
 
-        Location::create(['name' => 'جرمانا', 'parent_id' => $rif_damascus->id]);
-        Location::create(['name' => 'صحنايا', 'parent_id' => $rif_damascus->id]);
+        foreach ($damascusAreas as $areaName) {
+            $parentArea = Location::create([
+                'name' => $areaName,
+                'parent_id' => $damascus->id
+            ]);
 
-        Location::create(['name' => 'الفرقان', 'parent_id' => $aleppo->id]);
+            // إضافة أحياء فرعية لمناطق معينة (المستوى الثالث - مثل دشيش)
+            if ($areaName === 'دمشق القديمة') {
+                $subAreas = [
+                    'باب توما',
+                    'الحميدية',
+                    'الحريقة',
+                    'العمارة الجوانية'
+                ];
+                foreach ($subAreas as $sub) {
+                    Location::create(['name' => $sub, 'parent_id' => $parentArea->id]);
+                }
+            }
+        }
+
+        // 3. مناطق ريف دمشق (المستوى الثاني - بناءً على الصورة الثانية)
+        $rifAreas = [
+            'مركز ريف دمشق',
+            'دوما',
+            'القطيفة',
+            'التل',
+            'يبرود',
+            'النبك',
+            'الزبداني',
+            'قطنا',
+            'داريا'
+        ];
+
+        foreach ($rifAreas as $areaName) {
+            $parentRif = Location::create([
+                'name' => $areaName,
+                'parent_id' => $rif_damascus->id
+            ]);
+
+            // إضافة بلدات تتبع لـ "مركز ريف دمشق" (المستوى الثالث)
+            if ($areaName === 'مركز ريف دمشق') {
+                $subRif = [
+                    'حرستا',
+                    'زملكا',
+                    'عربين',
+                    'كفربطنا',
+                    'جرمانا',
+                    'صحنايا'
+                ];
+                foreach ($subRif as $sub) {
+                    Location::create(['name' => $sub, 'parent_id' => $parentRif->id]);
+                }
+            }
+        }
     }
 }

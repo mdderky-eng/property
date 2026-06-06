@@ -19,13 +19,14 @@ return new class extends Migration {
             $table->decimal('price', 15, 2); // سعر مناسب لليرة السورية
             $table->integer('area'); // المساحة
             $table->integer('rooms_count');
-            $table->boolean('is_furnished')->default(false);
-            $table->boolean('has_elevator')->default(false);
+            $table->boolean('is_furnished')->default(0); // مفروش أم لا
+            $table->boolean('has_elevator')->default(0);
             $table->enum('property_type', ['apartment', 'shop', 'villa', 'farm', 'land']);
             $table->enum('ownership_type', ['green_taboo', 'court_ruling', 'contract_sequence', 'state_property', 'other']);
             $table->enum('offer_type', ['sale', 'rent']);
-            $table->boolean('is_featured')->default(false); // عقار مميز
-            $table->boolean('is_available')->default(true); // متاح أو محجوز
+            $table->boolean('is_featured')->default(0); // عقار مميز
+            $table->enum('status', ['available', 'reserved', 'rented', 'sold'])->default('available');
+            // سابقاً كان العمود is_available، تم استبداله بـ status
             $table->timestamps();
         });
     }

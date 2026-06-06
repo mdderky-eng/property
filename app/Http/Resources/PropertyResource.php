@@ -22,10 +22,10 @@ class PropertyResource extends JsonResource
             'offer_type_display' => $this->getOfferTypeDisplay(),
             'ownership_type' => $this->ownership_type,
             'ownership_type_display' => $this->getOwnershipTypeDisplay(),
-            'is_furnished' => $this->is_furnished,
-            'has_elevator' => $this->has_elevator,
-            'is_featured' => $this->is_featured,
-            'is_available' => $this->is_available,
+            'is_furnished' => (bool) $this->is_furnished,
+            'has_elevator' => (bool) $this->has_elevator,
+            'is_featured' => (bool) $this->is_featured,
+            'status' => $this->status,
             'location' => new LocationResource($this->whenLoaded('location')),
             'images' => PropertyImageResource::collection($this->whenLoaded('images')),
             'user' => new UserResource($this->whenLoaded('user')),
@@ -36,7 +36,7 @@ class PropertyResource extends JsonResource
 
     private function getPropertyTypeDisplay(): string
     {
-        return match($this->property_type) {
+        return match ($this->property_type) {
             'apartment' => 'شقة',
             'shop' => 'محل',
             'villa' => 'فيلا',
@@ -48,7 +48,7 @@ class PropertyResource extends JsonResource
 
     private function getOfferTypeDisplay(): string
     {
-        return match($this->offer_type) {
+        return match ($this->offer_type) {
             'sale' => 'بيع',
             'rent' => 'إيجار',
             default => $this->offer_type,
@@ -57,7 +57,7 @@ class PropertyResource extends JsonResource
 
     private function getOwnershipTypeDisplay(): string
     {
-        return match($this->ownership_type) {
+        return match ($this->ownership_type) {
             'green_taboo' => 'طابو أخضر',
             'court_ruling' => 'حكم محكمة',
             'contract_sequence' => 'تسلسل عقد',

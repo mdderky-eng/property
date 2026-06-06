@@ -15,8 +15,12 @@ return new class extends Migration {
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('property_id')->constrained()->onDelete('cascade');
 
-            $table->string('status')->default('pending'); // (نشط، ملغى، مكتمل)
-            $table->text('notes')->nullable(); // ملاحظات إضافية من العميل
+            // الحقول الجديدة للإشعار والجدية
+            $table->string('transaction_number')->required(); // رقم العملية القادم في رسالة سيريتل/MTN كاش
+            $table->string('receipt_image')->required(); // مسار صورة إشعار التحويل (الـ Screenshot)
+
+            $table->string('client_note')->nullable();
+            $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->timestamps();
         });
     }

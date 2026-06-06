@@ -6,19 +6,28 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePropertyRequest;
 use App\Http\Requests\UpdatePropertyRequest;
 use App\Http\Resources\PropertyResource;
+use App\Models\Booking;
+use App\Models\Location;
 use Illuminate\Http\Request;
 use App\Models\Property;
+use App\Models\PropertyImage;
 
 class PropertyController extends Controller
 {
     public function index(Request $request)
     {
-        // نبدأ بالاستعلام الأساسي مع جلب الصور والمنطقة
+        // الاستعلام الأساسي مع جلب الصور والمنطقة
         $query = Property::with(['images', 'location']);
 
-        // 1. فلترة حسب المحافظة أو الحي (location_id)
+
         if ($request->has('location_id')) {
-            $query->where('location_id', $request->location_id);
+            $location = \App\Models\Location::find($request->location_id);
+
+            if ($location) {
+                // نجلب مصفوفة تضم ID المنطقة المختارة وكل ما يتبعها
+                $allIds = $location->getAllChildrenIds();
+                $query->whereIn('location_id', $allIds);
+            }
         }
 
         // 2. فلترة حسب نوع العقار (apartment, villa, shop, farm, land)
@@ -58,7 +67,7 @@ class PropertyController extends Controller
             $query->where('rooms_count', '<=', $request->max_rooms);
         }
 
-        // 7. فلترة حسب مؤثث / غير مؤثث
+        // 7. فلترة حسب مفروش / غير مفروش
         if ($request->has('is_furnished')) {
             $query->where('is_furnished', $request->boolean('is_furnished'));
         }
@@ -78,9 +87,9 @@ class PropertyController extends Controller
             $query->where('is_featured', $request->boolean('is_featured'));
         }
 
-        // 11. فلترة حسب التوفر (متاح / محجوز)
-        if ($request->has('is_available')) {
-            $query->where('is_available', $request->boolean('is_available'));
+        // 11. فلترة حسب حالة العقار
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
         }
 
         // 12. فلترة حسب البحث في العنوان أو الوصف
@@ -92,17 +101,23 @@ class PropertyController extends Controller
             });
         }
 
-        // 13. ترتيب النتائج
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
+        //  ترتيب النتائج
+        $sortRaw = $request->input('sort_by', 'created_at-desc');
+
+
+        $sortParts = explode('-', $sortRaw);
+        $sortBy = $sortParts[0]; // العمود (price)
+        $sortOrder = $sortParts[1] ?? 'desc'; // الاتجاه (desc) إذا لم يوجد نجعل الافتراضي desc
+
         $allowedSorts = ['price', 'area', 'rooms_count', 'created_at'];
 
         if (in_array($sortBy, $allowedSorts)) {
-            $query->orderBy($sortBy, $sortOrder === 'asc' ? 'asc' : 'desc');
+
+            $finalOrder = $request->input('sort_order', $sortOrder);
+            $query->orderBy($sortBy, $finalOrder === 'asc' ? 'asc' : 'desc');
         } else {
             $query->latest();
         }
-
         // جلب العقارات مع الترقيم (pagination)
         $perPage = $request->get('per_page', 15);
         $properties = $query->paginate($perPage);
@@ -158,18 +173,12 @@ class PropertyController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created property
-     */
+
     public function store(StorePropertyRequest $request)
     {
-        // Get validated data
         $validated = $request->validated();
-
-        // Add user_id (for now using a default user, in production use auth)
-        $validated['user_id'] = 1;
-
-        // Create property
+        $validated['user_id'] = auth()->id();
+        $validated['status'] = $request->input('status', 'available');
         $property = Property::create($validated);
 
         // Handle image upload if provided
@@ -192,71 +201,110 @@ class PropertyController extends Controller
             ->setStatusCode(201);
     }
 
-    /**
-     * Update an existing property
-     */
     public function update(UpdatePropertyRequest $request, $id)
     {
-        $property = Property::find($id);
+        $property = Property::findOrFail($id);
 
-        if (!$property) {
-            return response()->json(['message' => 'العقار غير موجود'], 404);
-        }
-
-        // Get validated data
         $validated = $request->validated();
 
-        // Update property
+        // معالجة قيم الحالة إذا أرسل المستخدم قيمة جديدة
+        if ($request->has('status')) {
+            $validated['status'] = $request->status;
+        }
+
         $property->update($validated);
 
-        // Handle new image upload if provided
+        // معالجة الصور: هنا سنضيف الصور الجديدة "إضافة" وليس "استبدال"
         if ($request->hasFile('images')) {
-            // Delete old images
-            $property->images()->delete();
-
-            foreach ($request->file('images') as $index => $image) {
+            foreach ($request->file('images') as $image) {
                 $path = $image->store('properties', 'public');
-
                 $property->images()->create([
                     'image_path' => $path,
-                    'is_primary' => $index === 0,
+                    'is_primary' => false, // الصور الجديدة ليست أساسية افتراضياً
                 ]);
             }
         }
 
-        // Load relationships and return
         $property->load(['images', 'location', 'user']);
-
         return (new PropertyResource($property))->response();
+
     }
 
-    /**
-     * Remove a property
-     */
-    public function destroy($id)
+    public function updateStatus(Request $request, $id)
     {
-        $property = Property::find($id);
+        $request->validate([
+            'status' => 'required|in:available,reserved,rented,sold'
+        ]);
 
-        if (!$property) {
-            return response()->json(['message' => 'العقار غير موجود'], 404);
+        $property = Property::findOrFail($id);
+
+        $property->status = $request->status;
+        $property->save();
+
+        // إذا تحول العقار إلى مباع أو مؤجر، ارفض كل الحجوزات المعلقة عليه تلقائياً
+        if (in_array($request->status, ['sold', 'rented'])) {
+            Booking::where('property_id', $id)
+                ->where('status', 'pending')
+                ->update(['status' => 'rejected']);
         }
-
-        // Delete property images from storage
-        foreach ($property->images as $image) {
-            \Storage::disk('public')->delete($image->image_path);
-        }
-
-        // Delete property
-        $property->delete();
 
         return response()->json([
-            'message' => 'تم حذف العقار بنجاح'
-        ], 200);
+            'message' => 'تم تحديث حالة العقار بنجاح.',
+            'property' => $property
+        ]);
     }
 
-    /**
-     * Get property statistics
-     */
+
+
+    public function destroy($id)
+    {
+
+
+        $property = Property::findOrFail($id);
+        $property->delete(); // الـ Observer سيتكفل بمسح الصور من المجلد تلقائياً
+        return response()->json(['message' => 'تم حذف العقار بنجاح']);
+    }
+
+    public function deleteImage($id)
+    {
+        // جلب الصورة أو إرجاع 404 إذا لم توجد
+        $image = \App\Models\PropertyImage::findOrFail($id);
+
+        // التحقق من أن المستخدم الحالي هو صاحب العقار
+        if ($image->property->user_id !== auth()->id()) {
+            return response()->json(['message' => 'غير مصرح لك بحذف هذه الصورة'], 403);
+        }
+
+        // حذف السجل من قاعدة البيانات
+        // ملاحظة: Observer سيقوم بحذف الملف تلقائياً
+        $image->delete();
+
+        return response()->json([
+            'message' => 'تم حذف الصورة بنجاح من العقار والسيرفر'
+        ], 200);
+    }
+    public function setMainImage($id)
+    {
+        //جلب الصورة المطلوبة
+        $image = PropertyImage::findOrFail($id);
+
+        //  التحقق من الملكية (صاحب العقار فقط)
+        if ($image->property->user_id !== auth()->id()) {
+            return response()->json(['message' => 'غير مصرح لك'], 403);
+        }
+
+        //  (المنطق البرمجي) اجعل كل صور هذا العقار غير أساسية أولاً
+        PropertyImage::where('property_id', $image->property_id)
+            ->update(['is_main' => false]);
+
+        //اجعل هذه الصورة المحددة هي الأساسية
+        $image->update(['is_main' => true]);
+
+        return response()->json([
+            'message' => 'تم تعيين الصورة كصورة أساسية بنجاح'
+        ]);
+    }
+
     public function statistics()
     {
         $stats = [
@@ -275,7 +323,7 @@ class PropertyController extends Controller
                 ->groupBy('location_id')
                 ->get(),
             'featured_count' => Property::where('is_featured', true)->count(),
-            'available_count' => Property::where('is_available', true)->count(),
+            'available_count' => Property::where('status', 'available')->count(),
             'rent_properties' => Property::where('offer_type', 'rent')->count(),
             'sale_properties' => Property::where('offer_type', 'sale')->count(),
             'avg_price' => Property::avg('price'),
@@ -284,4 +332,32 @@ class PropertyController extends Controller
 
         return response()->json($stats);
     }
+
+    public function compare(Request $request)
+    {
+        // التحقق من أن المدخلات تحتوي على رقمي عقارين موجودين بالفعل في قاعدة البيانات
+        $request->validate([
+            'property_id_1' => 'required|exists:properties,id',
+            'property_id_2' => 'required|exists:properties,id',
+        ], [
+            'property_id_1.exists' => 'العقار الأول غير موجود في النظام.',
+            'property_id_2.exists' => 'العقار الثاني غير موجود في النظام.',
+        ]);
+
+        // جلب بيانات العقارين مع الصور والموقع (العلاقات المرتبطة بهما)
+        $property1 = Property::with(['images', 'location'])->find($request->property_id_1);
+        $property2 = Property::with(['images', 'location'])->find($request->property_id_2);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+
+                'property_1' => new PropertyResource($property1),
+                'property_2' => new PropertyResource($property2),
+            ]
+        ], 200);
+    }
+
+
+
 }

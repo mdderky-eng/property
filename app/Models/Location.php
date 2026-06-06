@@ -17,4 +17,12 @@ class Location extends Model
         // العلاقة التي تجلب الأحياء التابعة للمحافظة
         return $this->hasMany(Location::class, 'parent_id');
     }
+    public function getAllChildrenIds()
+    {
+        $ids = [$this->id];
+        foreach ($this->children as $child) {
+            $ids = array_merge($ids, $child->getAllChildrenIds());
+        }
+        return $ids;
+    }
 }

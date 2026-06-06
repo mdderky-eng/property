@@ -17,8 +17,6 @@ return new class extends Migration {
             $table->string('client_phone');
             $table->date('appointment_date'); // التاريخ (مثلاً 2026-05-15)
             $table->time('appointment_time'); // الوقت (مثلاً 14:00:00)
-
-            // الحالة التي يتحكم بها الأدمن (قيد الانتظار، مقبول، مرفوض)
             $table->string('status')->default('pending');
             $table->timestamps();
         });

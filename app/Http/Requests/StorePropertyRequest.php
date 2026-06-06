@@ -26,7 +26,7 @@ class StorePropertyRequest extends FormRequest
             'is_furnished' => 'nullable|boolean',
             'has_elevator' => 'nullable|boolean',
             'is_featured' => 'nullable|boolean',
-            'is_available' => 'nullable|boolean',
+            'status' => 'nullable|in:available,reserved,rented,sold',
             'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ];
     }
@@ -75,7 +75,7 @@ class StorePropertyRequest extends FormRequest
             'is_furnished' => 'مؤثث',
             'has_elevator' => 'مصعد',
             'is_featured' => 'مميز',
-            'is_available' => 'متاح',
+            'status' => 'حالة العقار',
             'images' => 'الصور',
         ];
     }
